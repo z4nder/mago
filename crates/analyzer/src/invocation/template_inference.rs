@@ -148,6 +148,12 @@ fn infer_templates_from_input_and_container_types(
     let mut potential_template_violations = HashMap::default();
     let generic_container_parts_len = generic_container_parts.len();
 
+
+    let callable_overload_count = generic_container_parts
+        .iter()
+        .filter(|t| matches!(t, TAtomic::Callable(_)))
+        .count();
+
     for container_atomic_part in &generic_container_parts {
         match container_atomic_part {
             TAtomic::Array(container_array) => {
@@ -591,7 +597,11 @@ fn infer_templates_from_input_and_container_types(
                             container_parameter_type,
                             &input_param_for_inference,
                             template_result,
-                            InferenceOptions { infer_only_if_new: true, is_callable_param_inference: true, ..options },
+                            InferenceOptions {
+                                infer_only_if_new: true,
+                                is_callable_param_inference: callable_overload_count > 1,
+                                ..options
+                            },
                             violations,
                         );
                     }

@@ -466,6 +466,7 @@ test_case!(psl_total_length_range);
 test_case!(psl_proc_open_pipes);
 test_case!(psl_array_filter_nullable);
 test_case!(array_filter_mixed_input);
+test_case!(array_filter_callback_key_constraint);
 test_case!(psl_isset_optional_key);
 test_case!(wildcard_type);
 test_case!(psl_regressions);
