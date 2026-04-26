@@ -54,6 +54,7 @@ pub struct InferenceOptions {
     pub infer_only_if_new: bool,
     pub argument_offset: Option<usize>,
     pub source_span: Option<Span>,
+    pub is_callable_param_inference: bool,
 }
 
 #[derive(Debug)]
@@ -590,7 +591,7 @@ fn infer_templates_from_input_and_container_types(
                             container_parameter_type,
                             &input_param_for_inference,
                             template_result,
-                            InferenceOptions { infer_only_if_new: true, ..options },
+                            InferenceOptions { infer_only_if_new: true, is_callable_param_inference: true, ..options },
                             violations,
                         );
                     }
@@ -614,7 +615,7 @@ fn infer_templates_from_input_and_container_types(
                         container_return,
                         &input_return_for_inference,
                         template_result,
-                        InferenceOptions { infer_only_if_new: false, ..options },
+                        InferenceOptions { infer_only_if_new: false, is_callable_param_inference: false, ..options },
                         violations,
                     );
                 }
@@ -845,9 +846,14 @@ fn infer_templates_from_input_and_container_types(
             // - there are other generic parts (e.g., in `class-string<T>|T`) that might match
             // - the constraint is mixed (accepts anything)
             // - the input is a generic parameter (constraint will be checked at the call site)
+            // - we are inside callable parameter inference: the callable is one overload in a
+            //   union, so only one overload needs to match — violations from non-matching
+            //   overloads are false positives (e.g., K in `callable(K):bool` when the user's
+            //   callback targets value type V in `callable(V):bool`)
             if generic_container_parts_len == 1
                 && !expanded_constraint.is_mixed()
                 && !residual_input_type.is_generic_parameter()
+                && !options.is_callable_param_inference
             {
                 violations.push(TemplateInferenceViolation {
                     template_name: *template_parameter_name,
@@ -957,7 +963,7 @@ fn infer_templates_from_input_and_container_types(
             .and_then(|map| map.get(&defining_entity))
             .is_none_or(std::vec::Vec::is_empty);
 
-        if is_unresolved {
+        if is_unresolved && !options.is_callable_param_inference {
             violations.push(TemplateInferenceViolation {
                 template_name: template_parameter_name,
                 inferred_bound: inferred_type,
@@ -1077,6 +1083,7 @@ pub fn infer_parameter_templates_from_argument(
             infer_only_if_new: is_callable_argument,
             argument_offset: Some(argument_offset),
             source_span: Some(argument_span),
+            is_callable_param_inference: false,
         },
         &mut violations,
     );
@@ -1127,7 +1134,12 @@ pub fn infer_parameter_templates_from_default(
         parameter_type,
         default_type,
         template_result,
-        InferenceOptions { infer_only_if_new: default_type.is_callable(), argument_offset: None, source_span: None },
+        InferenceOptions {
+            infer_only_if_new: default_type.is_callable(),
+            argument_offset: None,
+            source_span: None,
+            is_callable_param_inference: false,
+        },
         &mut Vec::new(),
     );
 }
